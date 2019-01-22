@@ -13,19 +13,12 @@ for lib in "$PARENT"/lib/*; do
     source "$lib"
 done
 
-usage () {
+usage() {
     echo "
 $BASENAME
 
 Placeholder help message.
 "
-}
-
-chkmnt() {
-    local volume="$1"
-    if mount | grep -q "$volume"; then
-	diskutil unmountDisk "$volume"
-    fi
 }
 
 chfs() {

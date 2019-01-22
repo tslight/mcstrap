@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # infinite loop to get simple yes or no user input
 ask () {

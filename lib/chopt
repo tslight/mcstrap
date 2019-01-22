@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 show_menu() {
     local banner="$1"; shift 1; local options=("$@")
