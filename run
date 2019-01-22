@@ -1,0 +1,6 @@
+#!/bin/bash
+
+BASENAME="${0##*/}"
+DIRNAME="${0%/$BASENAME}"
+
+"$DIRNAME/bin/mcstrap"

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# Builds a disk image containing bootstrappr and packages.
+DIRNAME="$(dirname "$0")"
+PARENT="${DIRNAME%/bin}"
+DMGNAME="${PARENT}/mcstrap.dmg"
+
+if [[ -e "${PARENT}/${DMGNAME}" ]]; then
+    rm "${PARENT}/${DMGNAME}"
+fi
+
+echo "Creating $DMGNAME from $PARENT"
+
+if hdiutil create -fs HFS+ -srcfolder "$PARENT" "$DMGNAME"; then
+    echo "Success!"
+else
+    echo "Fail!"
+fi
