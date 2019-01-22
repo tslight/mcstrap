@@ -200,6 +200,7 @@ main() {
     echo "Welcome to McStrap!"
     echo  -------------------
     echo
+    pmset sleep 0 # disable sleep
     if ask "Would you like to install macOS? "; then
 	install_macos
     fi
