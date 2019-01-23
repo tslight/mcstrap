@@ -196,11 +196,9 @@ get_volume() {
 
 main() {
     chkroot
-    echo
-    echo "Welcome to McStrap!"
-    echo  -------------------
-    echo
-    pmset sleep 0 # disable sleep
+    msg="Welcome to McStrap!"; len="${#msg}"
+    printf '\n%s\n' "$msg"; eval printf '%.0s-' {1..$len}; printf '\n\n'
+    disable_sleep
     if ask "Would you like to install macOS? "; then
 	install_macos
     fi
