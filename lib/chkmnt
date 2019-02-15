@@ -2,6 +2,7 @@
 
 chkmnt() {
     local volume="$1"
+
     if mount | grep -q "$volume"; then
 	diskutil unmountDisk "$volume"
     fi

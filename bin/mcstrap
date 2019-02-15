@@ -31,29 +31,43 @@ chfs() {
     echo "$fs"
 }
 
-nuke() {
-    local banner="Available Internal Disks" prompt="Enter Disk Number" disk
-    local disks=($(diskutil list internal | grep /dev/disk | awk '{print $1}'))
-
-    disk=$(chopt "$banner" "$prompt" "${disks[@]}")
-    fs=$(chfs)
+format() {
+    local disk="$1" fs=$(chfs)
 
     read -rep "Enter a name for the disk: " name
+    echo "Formatting disk as $fs..." >&2
 
-    if ask "Are you sure you want to nuke $disk? "; then
-	chkmnt "/Volumes/$name" >&2
-	echo "Zeroing first MB of disk..." >&2
-	dd if=/dev/zero of="$disk" bs=1k count=1024 >&2
-	echo "Formatting disk as $fs..." >&2
-	diskutil eraseDisk "$fs" "$name" "$disk" >&2
+    if diskutil eraseDisk "$fs" "$name" "$disk" >&2; then
+	echo "Successfully formatted $disk as $fs." >&2
+    else
+	echo "Failed to format $disk as $fs." >&2
+	if ask "Would you like to try again with a different filesystem? "; then
+	    format "$disk" >&2
+	fi
     fi
 
-    if [[ -d "/Volumes/$name" ]]; then
+    if mount | grep -q "/Volumes/$name"; then
 	echo "/Volumes/$name"
     else
 	echo "Failed to mount $disk at /Volumes/$name. Aborting." >&2
 	exit 1
     fi
+}
+
+nuke() {
+    local banner="Available Internal Disks" prompt="Enter Disk Number" disk
+    local disks=($(diskutil list internal | grep /dev/disk | awk '{print $1}'))
+
+    disk=$(chopt "$banner" "$prompt" "${disks[@]}")
+
+    if ask "Are you sure you want to nuke $disk? "; then
+	chkmnt "/Volumes/$name" >&2
+	echo "Zeroing first MB of disk..." >&2
+	dd if=/dev/zero of="$disk" bs=1k count=1024 >&2
+	volume="$(format "$disk")"
+    fi
+
+    echo "$volume"
 }
 
 install_macos() {
