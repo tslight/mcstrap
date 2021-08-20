@@ -1,0 +1,7 @@
+#!/bin/bash
+
+disable_sleep() {
+    pmset sleep 0        # disable suspend to disk
+    pmset disksleep 0    # disable disk sleep
+    pmset displaysleep 0 # disable display sleep
+}

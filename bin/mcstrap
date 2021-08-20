@@ -1,0 +1,228 @@
+#!/bin/bash
+
+# dirname and basename not available in Recovery boot
+# so we get to use Bash pattern matching
+BASENAME="${0##*/}"
+DIRNAME="${0%/$BASENAME}"
+PARENT="${DIRNAME%/bin}"
+
+shopt -s nullglob # don't expand to literal string of glob
+export PATH=$PATH:$DIRNAME
+
+for lib in "$PARENT"/lib/*; do
+    source "$lib"
+done
+
+usage() {
+    echo "
+$BASENAME
+
+Placeholder help message.
+"
+}
+
+chfs() {
+    local banner="Choose a Filesystem" prompt="Enter Filesystem Number" fs
+    local options=(
+	"APFS"
+	"JHFS+"
+    )
+    fs=$(chopt "$banner" "$prompt" "${options[@]}")
+    echo "$fs"
+}
+
+format() {
+    local disk="$1" fs=$(chfs)
+
+    read -rep "Enter a name for the disk: " name
+    echo "Formatting disk as $fs..." >&2
+
+    if diskutil eraseDisk "$fs" "$name" "$disk" >&2; then
+	echo "Successfully formatted $disk as $fs." >&2
+    else
+	echo "Failed to format $disk as $fs." >&2
+	if ask "Would you like to try again with a different filesystem? "; then
+	    format "$disk" >&2
+	fi
+    fi
+
+    if mount | grep -q "/Volumes/$name"; then
+	echo "/Volumes/$name"
+    else
+	echo "Failed to mount $disk at /Volumes/$name. Aborting." >&2
+	exit 1
+    fi
+}
+
+nuke() {
+    local banner="Available Internal Disks" prompt="Enter Disk Number" disk
+    local disks=($(diskutil list internal | grep /dev/disk | awk '{print $1}'))
+
+    disk=$(chopt "$banner" "$prompt" "${disks[@]}")
+
+    if ask "Are you sure you want to nuke $disk? "; then
+	chkmnt "/Volumes/$name" >&2
+	echo "Zeroing first MB of disk..." >&2
+	dd if=/dev/zero of="$disk" bs=1k count=1024 >&2
+	volume="$(format "$disk")"
+    fi
+
+    echo "$volume"
+}
+
+install_macos() {
+    local banner="Choose macOS version" prompt="Enter version number"
+    local macos_installers=("${PARENT}/macos/Install macOS"*.app) macos_versions=()
+    local macos macospath installcmd
+
+    if [[ "${#macos_installers[@]}" -gt 0 ]]; then
+	if ask "Would you like to nuke your disk before installing? "; then
+	    volume=$(nuke)
+	else
+	    volume=$(get_volume)
+	fi
+	for installer in "${macos_installers[@]}"; do
+	    version="${installer##*/Install macOS }"
+	    version="${version%.app}"
+	    macos_versions+=("$version")
+	done
+	macos=$(chopt "$banner" "$prompt" "${macos_versions[@]}")
+	macospath="$PARENT/macos/Install macOS ${macos}.app"
+	installcmd="$macospath/Contents/Resources/startosinstall"
+
+	"$installcmd" --agreetolicense --volume "$volume"
+    else
+	echo "No macOS installers found in $PARENT/macos."
+    fi
+}
+
+install_packages() {
+    local volume="$1" pkgdir="$PARENT/packages"
+
+    for pkg in "$pkgdir"/* ; do
+	file="${pkg##*/}"
+	ext="${file##*.}"
+	case "$ext" in
+	    sh)
+		echo "Running $file"
+		bash "$pkg" "$volume"
+		;;
+	    pkg)
+		echo "Installing package: $file"
+		installer -pkg "$pkg" -target "$volume"
+		;;
+	    txt)
+		;;
+	    *)
+		echo "Unsupported file extension: $pkg"
+		;;
+	esac
+    done
+}
+
+install_outset() {
+    local volume="$1" outset_prefix="$PARENT/outset/MCS-Outset" location
+    local location_banner="What region are you in?"
+    local location_prompt="Enter region number"
+    local location_options=(
+	"Europe"
+	"Hong Kong"
+	"Indonesia"
+	"Singapore"
+    )
+
+    location=$(chopt "$location_banner" "$location_prompt" "${location_options[@]}")
+    case "$location" in
+	"Europe")
+	    echo "Installing ${outset_prefix}.pkg to $volume"
+	    installer -pkg "${outset_prefix}.pkg" -target "$volume"
+	    ;;
+	"Hong Kong")
+	    echo "Installing ${outset_prefix}.pkg to $volume"
+	    installer -pkg "${outset_prefix}-HK.pkg" -target "$volume"
+	    ;;
+	"Indonesia")
+	    echo "Installing ${outset_prefix}.pkg to $volume"
+	    installer -pkg "${outset_prefix}-IN.pkg" -target "$volume"
+	    ;;
+	"Singapore")
+	    agency_banner="What agency is this machine for?"
+	    agency_prompt="Enter agency number"
+	    agency_options=(
+		"Agency"
+		"Clear"
+		"Performance"
+	    )
+	    agency=$(chopt "$agency_banner" "$agency_prompt" "${agency_options[@]}")
+	    case "$agency" in
+		"Agency"|"Clear")
+		    echo "Installing ${outset_prefix}.pkg to $volume"
+		    installer -pkg "${outset_prefix}-SGA.pkg" -target "$volume"
+		    ;;
+		"Performance")
+		    echo "Installing ${outset_prefix}.pkg to $volume"
+		    installer -pkg "${outset_prefix}-SGM.pkg" -target "$volume"
+		    ;;
+	    esac
+	    ;;
+    esac
+}
+
+bye() {
+    local banner="McStrap complete. Now What?" prompt="Enter a Number" quit
+    local options=(
+	"Restart"
+	"Shutdown"
+	"Exit"
+    )
+    quit=$(chopt "$banner" "$prompt" "${options[@]}")
+    case "$quit" in
+	"Restart")
+	    echo
+	    echo "Restarting..."
+	    echo
+	    sleep 1
+	    shutdown -r now
+	    ;;
+	"Shutdown")
+	    echo
+	    echo "Shutting down..."
+	    echo
+	    sleep 1
+	    shutdown -h now
+	    ;;
+	"Exit")
+	    echo
+	    echo "Goodbye"
+	    echo
+	    exit 0
+	    ;;
+    esac
+}
+
+get_volume() {
+    local volumes=(/Volumes/*) volume
+    local banner="Which volume would you like to install to?"
+    local prompt="Enter Volume Number"
+    volume=$(chopt "$banner" "$prompt" "${volumes[@]}")
+    echo "$volume"
+}
+
+main() {
+    chkroot
+    msg="Welcome to McStrap!"; len="${#msg}"
+    printf '\n%s\n' "$msg"; eval printf '%.0s-' {1..$len}; printf '\n\n'
+    disable_sleep
+    if ask "Would you like to install macOS? "; then
+	install_macos
+    fi
+    if ask "Would you like to install packages? "; then
+	volume=$(get_volume)
+	install_packages "$volume"
+	install_outset "$volume"
+    fi
+    echo
+    bye
+}
+
+main "$@"
